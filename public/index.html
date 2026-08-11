@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Generator CV</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      background: #f4f6f8;
+      color: #1f2937;
+    }
+    header {
+      background: #111827;
+      color: white;
+      padding: 28px 20px;
+      text-align: center;
+    }
+    main {
+      max-width: 900px;
+      margin: 30px auto;
+      padding: 0 20px 50px;
+    }
+    .card {
+      background: white;
+      border-radius: 14px;
+      padding: 24px;
+      margin-bottom: 20px;
+      box-shadow: 0 4px 18px rgba(0,0,0,.07);
+    }
+    h1, h2 { margin-top: 0; }
+    label {
+      display: block;
+      margin: 14px 0 6px;
+      font-weight: 700;
+    }
+    input, textarea {
+      width: 100%;
+      padding: 12px;
+      border: 1px solid #d1d5db;
+      border-radius: 8px;
+      font: inherit;
+    }
+    textarea {
+      min-height: 120px;
+      resize: vertical;
+    }
+    button {
+      border: 0;
+      border-radius: 8px;
+      padding: 12px 18px;
+      font-size: 16px;
+      font-weight: 700;
+      cursor: pointer;
+      background: #2563eb;
+      color: white;
+      margin-top: 18px;
+    }
+    button.secondary {
+      background: #111827;
+      margin-left: 8px;
+    }
+    button:disabled {
+      opacity: .6;
+      cursor: not-allowed;
+    }
+    #result {
+      white-space: pre-wrap;
+      line-height: 1.6;
+      background: #fafafa;
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+      padding: 20px;
+      min-height: 180px;
+    }
+    .hidden { display: none; }
+    .error {
+      color: #b91c1c;
+      margin-top: 12px;
+      font-weight: 700;
+    }
+    .hint {
+      color: #6b7280;
+      font-size: 14px;
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>Generator CV</h1>
+  <p>Wypełnij dane, a AI przygotuje profesjonalne CV.</p>
+</header>
+
+<main>
+
+  <section class="card">
+    <h2>Twoje dane</h2>
+
+    <label for="name">Imię i nazwisko *</label>
+    <input id="name" required placeholder="Jan Kowalski">
+
+    <label for="job">Stanowisko / zawód *</label>
+    <input id="job" required placeholder="Frontend Developer">
+
+    <label for="email">E-mail</label>
+    <input id="email" type="email" placeholder="jan@example.com">
+
+    <label for="phone">Telefon</label>
+    <input id="phone" placeholder="+48 123 456 789">
+
+    <label for="location">Miejscowość</label>
+    <input id="location" placeholder="Wrocław">
+
+    <label for="education">Wykształcenie</label>
+    <textarea id="education"
+      placeholder="Np. Politechnika Wrocławska, Informatyka, 2020–2024"></textarea>
+
+    <label for="skills">Umiejętności</label>
+    <textarea id="skills"
+      placeholder="Np. JavaScript, React, HTML, CSS, Git"></textarea>
+
+    <label for="exp">Doświadczenie zawodowe *</label>
+    <textarea id="exp" required
+      placeholder="Opisz firmy, stanowiska, daty i najważniejsze obowiązki/osiągnięcia."></textarea>
+
+    <button id="generate">Generuj CV</button>
+
+    <div id="error" class="error"></div>
+  </section>
+
+  <section id="outputCard" class="card hidden">
+    <h2>Gotowe CV</h2>
+
+    <div id="result"></div>
+
+    <button id="pdf">Pobierz PDF</button>
+    <button id="print" class="secondary">
+      Drukuj / Zapisz jako PDF
+    </button>
+
+    <p class="hint">
+      Możesz użyć opcji drukowania, aby zapisać dokument jako PDF.
+    </p>
+  </section>
+
+</main>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+<script>
+  const $ = (id) => document.getElementById(id);
+
+  let lastCv = "";
+
+  $("generate").addEventListener("click", async () => {
+
+    $("error").textContent = "";
+
+    const name = $("name").value.trim();
+    const job = $("job").value.trim();
+    const exp = $("exp").value.trim();
+
+    if (!name || !job || !exp) {
+      $("error").textContent =
+        "Uzupełnij imię i nazwisko, stanowisko oraz doświadczenie.";
+      return;
+    }
+
+    const payload = {
+      name,
+      job,
+      email: $("email").value.trim(),
+      phone: $("phone").value.trim(),
+      location: $("location").value.trim(),
+      education: $("education").value.trim(),
+      skills: $("skills").value.trim(),
+      exp
+    };
+
+    const button = $("generate");
+
+    button.disabled = true;
+    button.textContent = "Generuję...";
+
+    try {
+
+      const response = await fetch("/generate", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(payload)
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          data.error || "Nie udało się wygenerować CV."
+        );
+      }
+
+      lastCv = data.cv;
+
+      $("result").textContent = lastCv;
+
+      $("outputCard").classList.remove("hidden");
+
+      $("outputCard").scrollIntoView({
+        behavior: "smooth"
+      });
+
+    } catch (err) {
+
+      $("error").textContent =
+        err.message || "Wystąpił błąd.";
+
+    } finally {
+
+      button.disabled = false;
+      button.textContent = "Generuj CV";
+    }
+  });
+
+  $("pdf").addEventListener("click", () => {
+
+    if (!lastCv) return;
+
+    const { jsPDF } = window.jspdf;
+
+    const doc = new jsPDF({
+      unit: "mm",
+      format: "a4"
+    });
+
+    const margin = 15;
+    const pageWidth = 210;
+    const pageHeight = 297;
+    const maxWidth = pageWidth - margin * 2;
+
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(10);
+
+    const lines =
+      doc.splitTextToSize(lastCv, maxWidth);
+
+    let y = margin;
+
+    for (const line of lines) {
+
+      if (y > pageHeight - margin) {
+        doc.addPage();
+        y = margin;
+      }
+
+      doc.text(line, margin, y);
+      y += 5;
+    }
+
+    doc.save("CV.pdf");
+  });
+
+  $("print").addEventListener("click", () => {
+    window.print();
+  });
+</script>
+
+</body>
+</html>
